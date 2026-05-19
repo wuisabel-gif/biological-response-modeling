@@ -1,0 +1,37 @@
+.DS_Store
+.ipynb_checkpoints/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Notebook and training outputs
+*.ckpt
+*.pt
+*.pth
+*.pkl
+*.pickle
+*.joblib
+*.npy
+*.npz
+*.csv.gz
+submission*.csv
+oof*.csv
+
+# Large local data / archives
+# Competition dataset files kept locally and not committed
+Data/
+train_features.csv
+train_targets_scored.csv
+artifacts/*
+!artifacts/README.md
+*.zip
+
+# Editor settings
+.vscode/
+.idea/

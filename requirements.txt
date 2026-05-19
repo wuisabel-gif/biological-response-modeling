@@ -1,0 +1,15 @@
+jupyterlab
+notebook
+ipython
+numpy
+pandas
+scipy
+matplotlib
+seaborn
+plotly
+scikit-learn
+torch
+iterative-stratification
+pytorch-tabnet
+tqdm
+colorama
