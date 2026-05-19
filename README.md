@@ -12,6 +12,8 @@ This repository contains my notebook-based pipeline for predicting a compound's 
 
 For me, this project was also a learning process. It gave me a way to apply statistics, machine learning, feature engineering, and model evaluation to a real biological prediction problem instead of only studying those ideas in isolation. I got to work through things like noisy data, correlated features, sparse labels, validation strategy, and ensemble behavior in a much more hands-on way.
 
+The final workflow explored three neural-network variants, one TabNet model, and average ensembling across submissions. The best result achieved a **top 3% leaderboard finish**.
+
 Ideally, this kind of project would be as simple as "feed in the biology data, train a model, get a clean answer." Of course, in practice, things are more complicated. Biological data is noisy, many features are strongly correlated, useful signals are often sparse, and a single compound can activate multiple mechanisms at once. So the real work is not just training a model. The real work is building a pipeline that makes the signal easier to learn.
 
 That is the purpose of this repository.
@@ -40,6 +42,16 @@ From a systems perspective, my goal was not just to train a single model, but to
 - captures broad statistical structure in the data
 - supports stable multi-label prediction
 - combines multiple modeling approaches rather than depending on one run
+
+## Data Overview
+
+The dataset includes **876 input columns** in total:
+
+- **872 float features** for gene-expression and cell-response measurements
+- **1 integer feature**: `cp_time`
+- **3 categorical features**: `sig_id`, `cp_type`, and `cp_dose`
+
+One nice property of the dataset is that it has **no missing values**, so the work here is less about imputation and more about signal shaping, feature construction, and robust prediction.
 
 ## Why This Problem Is Hard
 
@@ -110,6 +122,8 @@ These include measures such as:
 - standard deviations
 - skewness
 - kurtosis
+- multiplication between highly correlated features
+- squared versions of selected important features
 
 The value of these features is that they capture the overall "shape" of a biological response. Two compounds may not match feature-by-feature, but they may still produce similar higher-level response profiles.
 
@@ -145,6 +159,12 @@ Once the features are prepared, I train the main predictive models.
 
 The core workflow uses **PyTorch neural networks** for multi-label classification. These models are designed to learn non-linear relationships across the engineered biological feature set and produce one probability per target mechanism.
 
+Concretely, the project explores:
+
+- three neural-network / CNN-style variants
+- one TabNet model for tabular learning
+- average ensembling across model outputs
+
 There are also **TabNet experiments** in the repository, which provide an alternate modeling approach for tabular data. Rather than betting everything on one architecture, I explore multiple model families and compare how well they capture the signal.
 
 This is a good idea in general. Biological tabular data can be temperamental, and different model types often succeed on different parts of the problem.
@@ -157,7 +177,7 @@ To avoid that, I use **multilabel stratified cross-validation**. This means the 
 
 That matters because the targets are sparse and unevenly distributed. A naive split can produce misleading results, especially when some mechanisms are rare.
 
-Cross-validation gives a much better estimate of how the model will behave on unseen data.
+Cross-validation gives a much better estimate of how the model will behave on unseen data. Model quality is evaluated using **average log loss across drug–MoA annotation pairs**, which fits the multi-label nature of the problem and rewards calibrated probability estimates rather than just hard classifications.
 
 ## Ensembling
 
