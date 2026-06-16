@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Biological Response Modeling — Mechanism of Action Prediction</title>
+<meta name="description" content="A top-3% Kaggle pipeline that turns high-dimensional gene-expression and cell-response data into multi-label mechanism-of-action predictions. The full workflow, shown with real code.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;1,400&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* ---- palette (OKLCH) — cool paper, ink, indigo, signal-coral ---- */
+    --bg:        oklch(0.985 0.004 255);
+    --surface:   oklch(0.972 0.005 255);
+    --surface-2: oklch(0.948 0.007 255);
+    --ink:       oklch(0.235 0.022 262);
+    --ink-2:     oklch(0.392 0.022 262);
+    --muted:     oklch(0.502 0.018 262);
+    --line:      oklch(0.903 0.008 258);
+    --line-2:    oklch(0.838 0.011 258);
+    --primary:   oklch(0.478 0.152 264);
+    --primary-2: oklch(0.560 0.150 264);
+    --accent:    oklch(0.575 0.190 28);
+    --accent-2:  oklch(0.660 0.165 36);
+    /* data-viz diverging */
+    --cool:      oklch(0.560 0.130 252);
+    --hot:       oklch(0.620 0.200 30);
+
+    /* code listing tokens */
+    --code-bg:   oklch(0.976 0.006 258);
+    --code-kw:   oklch(0.470 0.150 295);   /* keyword - violet */
+    --code-fn:   oklch(0.480 0.150 264);   /* function - indigo */
+    --code-str:  oklch(0.470 0.110 155);   /* string - green */
+    --code-num:  oklch(0.520 0.170 35);    /* number - coral */
+    --code-com:  oklch(0.580 0.018 258);   /* comment - muted */
+
+    --maxw: 1080px;
+    --r: 12px;
+    --shadow: 0 1px 2px oklch(0.235 0.02 262 / 0.04), 0 6px 24px -10px oklch(0.235 0.04 262 / 0.10);
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    /* z-scale */
+    --z-nav: 100;
+    --z-top: 200;
+
+    --font-serif: "Spectral", Georgia, serif;
+    --font-sans: "Public Sans", system-ui, -apple-system, sans-serif;
+    --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  *,*::before,*::after{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; -webkit-text-size-adjust:100%; }
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:var(--font-sans);
+    font-size:1.0625rem;
+    line-height:1.7;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    /* faint scientific grid wash */
+    background-image:
+      linear-gradient(to right, oklch(0.5 0.02 262 / 0.018) 1px, transparent 1px),
+      linear-gradient(to bottom, oklch(0.5 0.02 262 / 0.018) 1px, transparent 1px);
+    background-size: 64px 64px;
+    background-position: center top;
+  }
+
+  h1,h2,h3,h4{ font-family:var(--font-serif); font-weight:600; line-height:1.12; letter-spacing:-0.018em; color:var(--ink); margin:0; }
+  h1{ text-wrap:balance; }
+  h2{ text-wrap:balance; }
+  p{ margin:0 0 1rem; }
+  a{ color:var(--primary); text-decoration:none; }
+  a:hover{ color:var(--primary-2); }
+  ::selection{ background:oklch(0.575 0.19 28 / 0.18); }
+
+  :focus-visible{ outline:2.5px solid var(--primary-2); outline-offset:3px; border-radius:4px; }
+
+  .wrap{ width:100%; max-width:var(--maxw); margin-inline:auto; padding-inline:clamp(1.1rem, 4vw, 2.2rem); }
+
+  .prose{ max-width:68ch; }
+  .prose p{ color:var(--ink-2); }
+
+  /* ---------- skip link ---------- */
+  .skip{ position:absolute; left:-9999px; top:0; z-index:var(--z-top); background:var(--ink); color:var(--bg); padding:.6rem 1rem; border-radius:8px; }
+  .skip:focus{ left:1rem; top:1rem; }
+
+  /* ---------- top nav ---------- */
+  .nav{
+    position:sticky; top:0; z-index:var(--z-nav);
+    backdrop-filter:saturate(1.4) blur(8px);
+    background:oklch(0.985 0.004 255 / 0.82);
+    border-bottom:1px solid var(--line);
+  }
+  .nav-in{ display:flex; align-items:center; gap:1.4rem; min-height:60px; }
+  .brand{ display:flex; align-items:center; gap:.6rem; font-weight:600; color:var(--ink); letter-spacing:-0.01em; margin-right:auto; }
+  .brand .mark{ width:26px; height:26px; flex:none; }
+  .brand small{ font-family:var(--font-mono); font-size:.7rem; color:var(--muted); font-weight:500; letter-spacing:0; }
+  .nav-links{ display:flex; gap:1.5rem; align-items:center; }
+  .nav-links a{ font-size:.92rem; color:var(--ink-2); font-weight:500; }
+  .nav-links a:hover{ color:var(--primary); }
+  .nav-gh{ display:inline-flex; align-items:center; gap:.45rem; font-size:.86rem; font-weight:600; padding:.4rem .8rem; border:1px solid var(--line-2); border-radius:8px; color:var(--ink); }
+  .nav-gh:hover{ border-color:var(--primary); color:var(--primary); }
+  @media (max-width: 800px){ .nav-links{ display:none; } }
+
+  /* ---------- hero ---------- */
+  .hero{ position:relative; padding-top:clamp(3rem, 8vw, 6rem); padding-bottom:clamp(2.5rem, 6vw, 4.5rem); overflow:hidden; }
+  .hero-grid{ display:grid; grid-template-columns:1.05fr 0.95fr; gap:clamp(2rem,5vw,4rem); align-items:center; }
+  @media (max-width: 920px){ .hero-grid{ grid-template-columns:1fr; } }
+
+  .tagline{ display:inline-flex; align-items:center; gap:.6rem; font-family:var(--font-mono); font-size:.78rem; font-weight:500; color:var(--ink-2); padding:.4rem .75rem; border:1px solid var(--line-2); border-radius:999px; background:var(--surface); margin-bottom:1.5rem; }
+  .tagline .dot{ width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 4px oklch(0.575 0.19 28 / 0.14); }
+
+  h1.headline{ font-size:clamp(2.4rem, 5.6vw, 4.1rem); font-weight:600; }
+  h1.headline em{ font-style:italic; color:var(--primary); font-weight:500; }
+  .lede{ margin-top:1.4rem; font-size:clamp(1.05rem,1.6vw,1.22rem); line-height:1.6; color:var(--ink-2); max-width:36ch; }
+
+  .hero-cta{ display:flex; flex-wrap:wrap; gap:.8rem; margin-top:2rem; }
+  .btn{ display:inline-flex; align-items:center; gap:.5rem; font-weight:600; font-size:.95rem; padding:.72rem 1.2rem; border-radius:10px; border:1px solid transparent; transition:transform .25s var(--ease), background .2s; }
+  .btn:active{ transform:translateY(1px); }
+  .btn-primary{ background:var(--ink); color:var(--bg); }
+  .btn-primary:hover{ background:oklch(0.32 0.04 264); color:var(--bg); }
+  .btn-ghost{ background:transparent; color:var(--ink); border-color:var(--line-2); }
+  .btn-ghost:hover{ border-color:var(--primary); color:var(--primary); }
+
+  /* hero figure */
+  .hero-fig{ position:relative; border:1px solid var(--line); border-radius:var(--r); background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+  .hero-fig figcaption{ display:flex; flex-wrap:wrap; justify-content:space-between; gap:.5rem 1rem; align-items:center; padding:.7rem .95rem; border-top:1px solid var(--line); font-family:var(--font-mono); font-size:.72rem; color:var(--muted); }
+  .hero-fig figcaption b{ color:var(--ink-2); font-weight:500; }
+  #heatmap{ display:block; width:100%; height:auto; }
+  .legend{ display:flex; align-items:center; gap:.45rem; }
+  .legend .ramp{ width:64px; height:8px; border-radius:3px; background:linear-gradient(90deg, var(--cool), oklch(0.93 0.01 255), var(--hot)); }
+
+  /* spec strip */
+  .spec{ margin-top:clamp(2.5rem,5vw,3.5rem); border-top:1px solid var(--line); border-bottom:1px solid var(--line); display:grid; grid-template-columns:repeat(5,1fr); }
+  @media (max-width: 760px){ .spec{ grid-template-columns:repeat(2,1fr); } }
+  @media (max-width: 420px){ .spec{ grid-template-columns:1fr 1fr; } }
+  .spec div{ padding:1.1rem 1.2rem; border-left:1px solid var(--line); }
+  .spec div:first-child{ border-left:none; }
+  @media (max-width:760px){ .spec div{ border-top:1px solid var(--line); } .spec div:nth-child(-n+2){ border-top:none; } .spec div:nth-child(odd){ border-left:none; } }
+  .spec dt{ font-family:var(--font-mono); font-size:.72rem; letter-spacing:.02em; color:var(--muted); margin-bottom:.3rem; }
+  .spec dd{ margin:0; font-family:var(--font-serif); font-size:clamp(1.4rem,2.4vw,1.85rem); font-weight:600; letter-spacing:-0.02em; }
+  .spec dd small{ font-family:var(--font-sans); font-size:.8rem; font-weight:500; color:var(--muted); letter-spacing:0; }
+
+  /* ---------- section scaffold ---------- */
+  section{ padding-block:clamp(3.5rem, 8vw, 6rem); }
+  .sec-head{ max-width:62ch; margin-bottom:clamp(2rem,4vw,3rem); }
+  .kicker{ font-family:var(--font-mono); font-size:.76rem; font-weight:500; color:var(--accent); margin-bottom:.7rem; }
+  .sec-head h2{ font-size:clamp(1.7rem,3.4vw,2.55rem); }
+  .sec-head p{ margin-top:1rem; color:var(--ink-2); font-size:1.08rem; }
+
+  .band{ background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line); }
+
+  /* problem grid */
+  .why{ display:grid; grid-template-columns:1.1fr 1fr; gap:clamp(2rem,5vw,4rem); align-items:start; }
+  @media (max-width:880px){ .why{ grid-template-columns:1fr; } }
+  .difficulties{ list-style:none; margin:0; padding:0; display:grid; gap:.2rem; }
+  .difficulties li{ display:grid; grid-template-columns:auto 1fr; gap:1rem; padding:1rem 0; border-top:1px solid var(--line); }
+  .difficulties li:first-child{ border-top:none; }
+  .difficulties .n{ font-family:var(--font-mono); font-size:.8rem; color:var(--accent); padding-top:.18rem; }
+  .difficulties h4{ font-family:var(--font-sans); font-size:1rem; font-weight:600; margin-bottom:.15rem; }
+  .difficulties p{ margin:0; font-size:.95rem; color:var(--muted); }
+
+  /* sample -> probabilities mini viz */
+  .samplecard{ border:1px solid var(--line); border-radius:var(--r); background:var(--bg); box-shadow:var(--shadow); padding:1.3rem 1.4rem; }
+  .samplecard .lbl{ font-family:var(--font-mono); font-size:.74rem; color:var(--muted); }
+  .flowrow{ display:flex; align-items:center; gap:1rem; margin-top:1rem; }
+  .chip{ font-family:var(--font-mono); font-size:.78rem; padding:.45rem .7rem; border-radius:8px; background:var(--surface-2); border:1px solid var(--line); white-space:nowrap; }
+  .arrow{ flex:1; height:2px; background:linear-gradient(90deg,var(--line-2),var(--primary)); position:relative; min-width:24px; }
+  .arrow::after{ content:""; position:absolute; right:-1px; top:50%; transform:translateY(-50%); border-left:7px solid var(--primary); border-top:5px solid transparent; border-bottom:5px solid transparent; }
+  #probbars{ display:block; width:100%; height:auto; margin-top:1.1rem; }
+  .probnote{ font-size:.86rem; color:var(--muted); margin-top:.6rem; }
+
+  /* data composition */
+  .data-grid{ display:grid; grid-template-columns:1fr 1fr; gap:clamp(2rem,5vw,3.5rem); align-items:center; }
+  @media (max-width:880px){ .data-grid{ grid-template-columns:1fr; } }
+  .compbar{ display:flex; height:64px; border-radius:10px; overflow:hidden; border:1px solid var(--line-2); font-family:var(--font-mono); font-size:.72rem; }
+  .compbar span{ display:flex; align-items:center; justify-content:center; color:#fff; font-weight:500; }
+  .compkeys{ display:flex; flex-wrap:wrap; gap:1.1rem; margin-top:1.1rem; }
+  .compkeys b{ display:inline-flex; align-items:center; gap:.5rem; font-family:var(--font-sans); font-weight:500; font-size:.9rem; color:var(--ink-2); }
+  .compkeys i{ width:11px; height:11px; border-radius:3px; flex:none; font-style:normal; }
+  .datacols{ list-style:none; margin:0; padding:0; }
+  .datacols li{ display:flex; justify-content:space-between; gap:1rem; padding:.7rem 0; border-bottom:1px solid var(--line); font-size:.95rem; }
+  .datacols li:last-child{ border-bottom:none; }
+  .datacols code{ font-family:var(--font-mono); font-size:.85rem; background:var(--surface-2); padding:.12rem .4rem; border-radius:5px; color:var(--ink); }
+  .datacols .v{ color:var(--muted); }
+
+  /* ---------- pipeline ---------- */
+  .phase-label{ display:flex; align-items:center; gap:1rem; margin:0 0 1.6rem; }
+  .phase-label span{ font-family:var(--font-mono); font-size:.78rem; color:var(--accent); }
+  .phase-label hr{ flex:1; border:none; border-top:1px solid var(--line-2); margin:0; }
+  .phase-label h3{ font-family:var(--font-sans); font-size:.95rem; font-weight:700; letter-spacing:.01em; color:var(--ink); text-transform:uppercase; }
+
+  .stage{ display:grid; grid-template-columns:minmax(0,0.92fr) minmax(0,1.08fr); gap:clamp(1.5rem,4vw,3rem); padding-block:clamp(2rem,4vw,3rem); border-top:1px solid var(--line); align-items:start; }
+  .stage:first-of-type{ border-top:none; }
+  @media (max-width:900px){ .stage{ grid-template-columns:1fr; gap:1.5rem; } }
+  .stage-meta .step{ display:inline-flex; align-items:center; justify-content:center; width:2.4rem; height:2.4rem; border-radius:10px; background:var(--ink); color:var(--bg); font-family:var(--font-mono); font-weight:500; font-size:.95rem; margin-bottom:1rem; }
+  .stage-meta h3{ font-size:1.5rem; margin-bottom:.6rem; }
+  .stage-meta .tool{ display:inline-block; font-family:var(--font-mono); font-size:.72rem; color:var(--primary); background:oklch(0.478 0.152 264 / 0.08); padding:.22rem .55rem; border-radius:6px; margin-bottom:.9rem; }
+  .stage-meta p{ font-size:.97rem; color:var(--ink-2); margin-bottom:.7rem; }
+  .stage-meta .pts{ list-style:none; margin:.4rem 0 0; padding:0; }
+  .stage-meta .pts li{ position:relative; padding-left:1.3rem; font-size:.92rem; color:var(--muted); margin-bottom:.4rem; }
+  .stage-meta .pts li::before{ content:""; position:absolute; left:0; top:.62em; width:6px; height:6px; border-radius:50%; background:var(--accent); }
+
+  /* code block */
+  .code{ border:1px solid var(--line-2); border-radius:var(--r); background:var(--code-bg); overflow:hidden; box-shadow:var(--shadow); }
+  .code[open]{ }
+  .code summary{ list-style:none; cursor:pointer; display:flex; align-items:center; gap:.7rem; padding:.6rem .85rem; background:var(--surface-2); border-bottom:1px solid transparent; font-family:var(--font-mono); font-size:.76rem; color:var(--ink-2); user-select:none; }
+  .code[open] summary{ border-bottom-color:var(--line); }
+  .code summary::-webkit-details-marker{ display:none; }
+  .code summary .dots{ display:flex; gap:.32rem; }
+  .code summary .dots i{ width:9px; height:9px; border-radius:50%; display:block; }
+  .code summary .file{ color:var(--ink); font-weight:500; }
+  .code summary .toggle{ margin-left:auto; display:flex; align-items:center; gap:.7rem; }
+  .code summary .chev{ transition:transform .25s var(--ease); }
+  .code[open] summary .chev{ transform:rotate(180deg); }
+  .copybtn{ font-family:var(--font-mono); font-size:.72rem; color:var(--ink-2); background:var(--bg); border:1px solid var(--line-2); border-radius:6px; padding:.2rem .5rem; cursor:pointer; }
+  .copybtn:hover{ border-color:var(--primary); color:var(--primary); }
+  .copybtn.ok{ color:var(--code-str); border-color:var(--code-str); }
+  pre.src{ margin:0; overflow-x:auto; padding:.9rem 0; font-family:var(--font-mono); font-size:.795rem; line-height:1.62; tab-size:4; }
+  pre.src .line{ display:block; padding:0 1.1rem 0 0; counter-increment:ln; white-space:pre; }
+  pre.src .line::before{ content:counter(ln); display:inline-block; width:2.6rem; padding-right:1rem; margin-right:.4rem; text-align:right; color:oklch(0.72 0.01 258); border-right:1px solid var(--line); -webkit-user-select:none; user-select:none; }
+  pre.src{ counter-reset:ln; }
+  .tok-kw{ color:var(--code-kw); font-weight:500; }
+  .tok-fn{ color:var(--code-fn); }
+  .tok-str{ color:var(--code-str); }
+  .tok-num{ color:var(--code-num); }
+  .tok-com{ color:var(--code-com); font-style:italic; }
+
+  /* ---------- models / results ---------- */
+  .results{ display:grid; grid-template-columns:1.15fr 1fr; gap:clamp(2rem,5vw,3.5rem); align-items:start; }
+  @media (max-width:900px){ .results{ grid-template-columns:1fr; } }
+  .modeltable{ display:grid; gap:0; }
+  .mrow{ display:grid; grid-template-columns:1fr auto; gap:.5rem 1rem; align-items:center; padding:1rem 0; border-top:1px solid var(--line); }
+  .mrow:first-child{ border-top:none; }
+  .mrow .mname{ font-weight:600; font-size:.98rem; }
+  .mrow .mfam{ font-family:var(--font-mono); font-size:.74rem; color:var(--muted); }
+  .mrow .mscore{ font-family:var(--font-mono); font-size:1.05rem; font-weight:500; color:var(--ink); justify-self:end; }
+  .mrow .mbar{ grid-column:1 / -1; height:7px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+  .mrow .mbar i{ display:block; height:100%; border-radius:99px; background:linear-gradient(90deg,var(--cool),var(--primary)); }
+  .mrow.best .mbar i{ background:linear-gradient(90deg,var(--accent-2),var(--accent)); }
+  .mrow.best .mscore{ color:var(--accent); }
+  .badge-best{ font-family:var(--font-mono); font-size:.66rem; color:var(--accent); border:1px solid var(--accent); border-radius:5px; padding:.06rem .4rem; margin-left:.5rem; vertical-align:middle; }
+
+  .resnote{ font-size:.85rem; color:var(--muted); margin-top:1.2rem; }
+  .finish{ border:1px solid var(--line-2); border-radius:var(--r); padding:1.6rem; background:var(--bg); box-shadow:var(--shadow); }
+  .finish .big{ font-family:var(--font-serif); font-size:clamp(2.4rem,5vw,3.4rem); font-weight:600; letter-spacing:-0.03em; color:var(--ink); line-height:1; }
+  .finish .big em{ font-style:normal; color:var(--accent); }
+  .finish p{ margin:.7rem 0 0; color:var(--ink-2); font-size:.97rem; }
+  .finish ul{ margin:1.1rem 0 0; padding:0; list-style:none; }
+  .finish li{ display:flex; gap:.6rem; padding:.45rem 0; font-size:.92rem; color:var(--ink-2); border-top:1px solid var(--line); }
+  .finish li:first-child{ border-top:none; }
+  .finish li b{ color:var(--ink); }
+
+  /* ---------- notebooks ---------- */
+  .nb-list{ list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:0; border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--bg); }
+  .nb-list li{ border-top:1px solid var(--line); border-left:1px solid var(--line); padding:1.2rem 1.3rem; }
+  .nb-list li a{ display:flex; align-items:center; gap:.55rem; font-family:var(--font-mono); font-size:.86rem; font-weight:500; color:var(--ink); }
+  .nb-list li a:hover{ color:var(--primary); }
+  .nb-list li a svg{ flex:none; color:var(--accent); }
+  .nb-list li p{ margin:.4rem 0 0; font-size:.88rem; color:var(--muted); }
+
+  /* tech stack */
+  .stack{ display:flex; flex-wrap:wrap; gap:.55rem; margin-top:1.6rem; }
+  .stack span{ font-family:var(--font-mono); font-size:.78rem; color:var(--ink-2); border:1px solid var(--line-2); border-radius:7px; padding:.32rem .65rem; background:var(--bg); }
+
+  /* footer */
+  footer{ border-top:1px solid var(--line); background:var(--surface); padding-block:clamp(2.5rem,5vw,3.5rem); }
+  .foot-in{ display:flex; flex-wrap:wrap; justify-content:space-between; gap:1.5rem; align-items:flex-start; }
+  footer p{ color:var(--muted); font-size:.88rem; margin:0; max-width:46ch; }
+  footer .foot-links{ display:flex; gap:1.4rem; }
+  footer .foot-links a{ font-size:.9rem; font-weight:500; color:var(--ink-2); }
+
+  /* ---------- reveal motion (enhances an already-visible default) ---------- */
+  @media (prefers-reduced-motion: no-preference){
+    .has-js .reveal{ opacity:0; transform:translateY(16px); transition:opacity .7s var(--ease), transform .7s var(--ease); }
+    .has-js .reveal.in{ opacity:1; transform:none; }
+    .has-js .stagger > *{ opacity:0; transform:translateY(14px); transition:opacity .6s var(--ease), transform .6s var(--ease); }
+    .has-js .stagger.in > *{ opacity:1; transform:none; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#overview">Skip to content</a>
+
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" aria-label="Biological Response Modeling home">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <rect x="1" y="1" width="30" height="30" rx="8" fill="oklch(0.235 0.022 262)"/>
+        <path d="M10 22c0-6 12-6 12-12" stroke="oklch(0.66 0.165 36)" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M10 10c0 6 12 6 12 12" stroke="oklch(0.56 0.15 264)" stroke-width="2.4" stroke-linecap="round"/>
+        <circle cx="10" cy="10" r="2.2" fill="oklch(0.985 0.004 255)"/>
+        <circle cx="22" cy="22" r="2.2" fill="oklch(0.985 0.004 255)"/>
+      </svg>
+      <span>Biological Response Modeling<br><small>MoA Prediction · lish-moa</small></span>
+    </a>
+    <nav class="nav-links" aria-label="Section">
+      <a href="#problem">Problem</a>
+      <a href="#data">Data</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="#models">Models</a>
+      <a href="#notebooks">Notebooks</a>
+    </nav>
+    <a class="nav-gh" href="https://www.kaggle.com/competitions/lish-moa" target="_blank" rel="noopener">
+      <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+      Kaggle
+    </a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="overview" style="padding-top:clamp(2.4rem,6vw,4rem)">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div class="reveal">
+        <span class="tagline"><span class="dot"></span> Kaggle · lish-moa · top 3% finish</span>
+        <h1 class="headline">From a biological fingerprint to a <em>mechanism of action</em>.</h1>
+        <p class="lede">A multi-label modeling pipeline that reads how a compound perturbs genes and cells — then infers what it is probably <em>doing</em>.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#pipeline">Walk the pipeline
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="#models">See the results</a>
+        </div>
+      </div>
+      <figure class="hero-fig reveal" aria-label="Illustrative gene and cell response matrix">
+        <canvas id="heatmap" width="560" height="360" role="img" aria-label="Animated heatmap of gene-expression and cell-viability responses across compound treatments"></canvas>
+        <figcaption>
+          <b>response matrix · 872 features × N treatments</b>
+          <span class="legend">suppressed <span class="ramp"></span> activated</span>
+        </figcaption>
+      </figure>
+    </div>
+
+    <dl class="spec reveal">
+      <div><dt>input columns</dt><dd>876</dd></div>
+      <div><dt>MoA targets</dt><dd>206 <small>multi-label</small></dd></div>
+      <div><dt>treatments</dt><dd>23,814</dd></div>
+      <div><dt>best CV log loss</dt><dd>0.01444</dd></div>
+      <div><dt>leaderboard</dt><dd>top 3%</dd></div>
+    </dl>
+  </div>
+</section>
+
+<!-- ============ PROBLEM ============ -->
+<section class="band" id="problem">
+  <div class="wrap">
+    <div class="why">
+      <div>
+        <div class="sec-head" style="margin-bottom:1.6rem">
+          <p class="kicker">why it's hard</p>
+          <h2>Not one label. Many, at once.</h2>
+        </div>
+        <div class="prose">
+          <p>In the Mechanisms of Action setting, a single compound can trigger <strong>several biological mechanisms simultaneously</strong>. The model can't pick one class — it has to emit a calibrated probability for every one of the 206 targets, for every treatment.</p>
+          <p>That, layered on top of noisy and heavily correlated high-dimensional signal, is what makes the problem interesting. Most of the work happens <em>before</em> the model: reshaping raw measurements into a form the network can actually learn from.</p>
+        </div>
+        <ul class="difficulties stagger">
+          <li><span class="n">01</span><div><h4>Multi-label by nature</h4><p>One treatment may map to many mechanisms — the output is a vector of probabilities, not a class.</p></div></li>
+          <li><span class="n">02</span><div><h4>High dimensional</h4><p>Hundreds of gene and cell features, many carrying overlapping information.</p></div></li>
+          <li><span class="n">03</span><div><h4>Sparse, uneven targets</h4><p>Some mechanisms are rare, so naïve validation splits quietly mislead you.</p></div></li>
+          <li><span class="n">04</span><div><h4>Noisy signal</h4><p>Biological measurements are skewed with outliers that destabilize training.</p></div></li>
+        </ul>
+      </div>
+      <div class="samplecard reveal">
+        <span class="lbl">one treatment →</span>
+        <div class="flowrow">
+          <span class="chip">gene + cell response</span>
+          <span class="arrow" aria-hidden="true"></span>
+          <span class="chip">P(MoA) × 206</span>
+        </div>
+        <svg id="probbars" viewBox="0 0 460 150" role="img" aria-label="Sparse probability output: most of 206 mechanisms near zero, a few elevated">
+          <!-- bars injected by JS -->
+        </svg>
+        <p class="probnote">Scored by mean log loss across all drug–MoA pairs — it rewards calibrated probabilities, not just the top guess.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ DATA ============ -->
+<section id="data">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="kicker">the data</p>
+      <h2>876 columns, no missing values.</h2>
+      <p>The job here is less about imputation and more about signal shaping — making real structure easier for the model to find.</p>
+    </div>
+    <div class="data-grid">
+      <div class="reveal">
+        <div class="compbar" role="img" aria-label="876 columns: 872 float gene and cell features, 1 integer cp_time, 3 categorical">
+          <span style="flex:872; background:var(--primary)">872 float</span>
+          <span style="flex:14; background:var(--accent); font-size:0">1</span>
+          <span style="flex:30; background:var(--ink-2)">3 cat</span>
+        </div>
+        <div class="compkeys">
+          <b><i style="background:var(--primary)"></i> 872 float — gene (<code style="all:unset;font-family:var(--font-mono)">g-*</code>) &amp; cell (<code style="all:unset;font-family:var(--font-mono)">c-*</code>)</b>
+          <b><i style="background:var(--accent)"></i> 1 integer — exposure time</b>
+          <b><i style="background:var(--ink-2)"></i> 3 categorical — id, type, dose</b>
+        </div>
+        <p class="prose" style="margin-top:1.4rem; color:var(--muted); font-size:.95rem">Gene-expression and cell-viability readings form a high-dimensional description of how a biological system responded to each compound.</p>
+      </div>
+      <ul class="datacols reveal">
+        <li><span><code>g-0 … g-771</code> gene expression</span><span class="v">772 float</span></li>
+        <li><span><code>c-0 … c-99</code> cell viability</span><span class="v">100 float</span></li>
+        <li><span><code>cp_time</code> exposure window</span><span class="v">24 / 48 / 72 h</span></li>
+        <li><span><code>cp_dose</code> dose level</span><span class="v">D1 / D2</span></li>
+        <li><span><code>cp_type</code> treatment vs control</span><span class="v">categorical</span></li>
+        <li><span><code>sig_id</code> sample signature</span><span class="v">identifier</span></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section class="band" id="pipeline">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="kicker">the pipeline</p>
+      <h2>Eight stages, raw signal to ranked prediction.</h2>
+      <p>The performance comes from the whole workflow, not one model. Every stage below is shown with the real code from the notebooks — expand any block to read it.</p>
+    </div>
+
+    <div class="phase-label reveal"><h3>Phase 1 — Signal shaping</h3><hr><span>before the model sees anything</span></div>
+
+    <!-- Stage 1 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">1</span>
+        <h3>RankGauss normalization</h3>
+        <span class="tool">sklearn · QuantileTransformer</span>
+        <p>Raw biological measurements are skewed with extreme values. A quantile transform maps every gene and cell feature onto a clean normal distribution.</p>
+        <ul class="pts">
+          <li>Tames outliers feature-by-feature</li>
+          <li>Stabilizes neural-network optimization</li>
+          <li>Fit on train, applied identically to test</li>
+        </ul>
+      </div>
+      <div class="reveal" data-code="normalize"></div>
+    </article>
+
+    <!-- Stage 2 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">2</span>
+        <h3>PCA compression</h3>
+        <span class="tool">sklearn · PCA</span>
+        <p>Genes and cells move together, so the raw space is bigger than the useful one. PCA adds compressed summaries of the strongest patterns — a second view alongside the originals.</p>
+        <ul class="pts">
+          <li>Separate decompositions for genes and cells</li>
+          <li>Fit on train + test concatenated</li>
+          <li>Augments, doesn't replace, raw features</li>
+        </ul>
+      </div>
+      <div class="reveal" data-code="pca"></div>
+    </article>
+
+    <!-- Stage 3 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">3</span>
+        <h3>Statistical feature engineering</h3>
+        <span class="tool">pandas</span>
+        <p>Aggregate descriptors capture the overall <em>shape</em> of a response — two compounds that don't match column-by-column may still share a higher-level profile.</p>
+        <ul class="pts">
+          <li>Sums, means, std, skew, kurtosis per group</li>
+          <li>Products of correlated cell pairs</li>
+          <li>Squared versions of key features</li>
+        </ul>
+      </div>
+      <div class="reveal" data-code="stats"></div>
+    </article>
+
+    <!-- Stage 4 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">4</span>
+        <h3>Cluster features</h3>
+        <span class="tool">sklearn · KMeans</span>
+        <p>Grouping samples with similar gene, cell, or PCA profiles — then one-hot encoding the cluster id back in — gives the model context about which response <em>family</em> a sample belongs to.</p>
+        <ul class="pts">
+          <li>Clusters over genes, cells, and PCA space</li>
+          <li>One-hot encoded as new inputs</li>
+        </ul>
+      </div>
+      <div class="reveal" data-code="cluster"></div>
+    </article>
+
+    <!-- Stage 5 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">5</span>
+        <h3>Variance filtering</h3>
+        <span class="tool">sklearn · VarianceThreshold</span>
+        <p>Features that barely move add noise, not signal. A variance threshold drops the dead weight before training to keep the feature space focused and reduce overfitting.</p>
+      </div>
+      <div class="reveal" data-code="variance"></div>
+    </article>
+
+    <div class="phase-label reveal" style="margin-top:2.5rem"><h3>Phase 2 — Modeling &amp; ensembling</h3><hr><span>learning the mechanisms</span></div>
+
+    <!-- Stage 6 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">6</span>
+        <h3>Network architecture</h3>
+        <span class="tool">PyTorch</span>
+        <p>A weight-normalized MLP with batch-norm and dropout learns non-linear relationships across the engineered features, emitting one logit per target. A recalibration guard keeps weight-norm stable.</p>
+        <ul class="pts">
+          <li>BatchNorm → weight-norm dense → LeakyReLU</li>
+          <li>Label-smoothed BCE loss</li>
+          <li>NaN recalibration on the weight vectors</li>
+        </ul>
+      </div>
+      <div class="reveal" data-code="model"></div>
+    </article>
+
+    <!-- Stage 7 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">7</span>
+        <h3>Stratified cross-validation</h3>
+        <span class="tool">iterative-stratification</span>
+        <p>Because targets are sparse and uneven, folds are built with multi-label stratification so label balance is preserved across train and validation — honest estimates on unseen data.</p>
+      </div>
+      <div class="reveal" data-code="cv"></div>
+    </article>
+
+    <!-- Stage 8 -->
+    <article class="stage">
+      <div class="stage-meta reveal">
+        <span class="step">8</span>
+        <h3>Training &amp; ensembling</h3>
+        <span class="tool">PyTorch · OneCycleLR</span>
+        <p>Each fold trains with a one-cycle schedule and early stopping, saving the best checkpoint. Final predictions blend multiple model families — they make different mistakes, so the blend is steadier than any one.</p>
+        <ul class="pts">
+          <li>Adam + OneCycleLR, best-checkpoint per fold</li>
+          <li>Averaged across folds, seeds, and architectures</li>
+        </ul>
+      </div>
+      <div class="reveal" data-code="train"></div>
+    </article>
+
+  </div>
+</section>
+
+<!-- ============ MODELS / RESULTS ============ -->
+<section id="models">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="kicker">models explored</p>
+      <h2>Three neural variants, one TabNet, blended.</h2>
+      <p>Rather than betting on a single architecture, the workflow compares several and averages their outputs. Lower log loss is better.</p>
+    </div>
+    <div class="results">
+      <div class="modeltable reveal">
+        <div class="mrow best">
+          <div><div class="mname">PyTorch — separate added features <span class="badge-best">best single</span></div><div class="mfam">neural network · engineered FE</div></div>
+          <div class="mscore">0.01444</div>
+          <div class="mbar"><i style="width:100%"></i></div>
+        </div>
+        <div class="mrow">
+          <div><div class="mname">PyTorch — feature engineering</div><div class="mfam">neural network</div></div>
+          <div class="mscore">0.01458</div>
+          <div class="mbar"><i style="width:96%"></i></div>
+        </div>
+        <div class="mrow">
+          <div><div class="mname">PyTorch — transfer + added features</div><div class="mfam">neural network · transfer</div></div>
+          <div class="mscore">0.01544</div>
+          <div class="mbar"><i style="width:73%"></i></div>
+        </div>
+        <div class="mrow">
+          <div><div class="mname">TabNet</div><div class="mfam">attentive tabular learner</div></div>
+          <div class="mscore">0.016426</div>
+          <div class="mbar"><i style="width:53%"></i></div>
+        </div>
+      </div>
+      <aside class="finish reveal">
+        <div class="big">Top <em>3%</em></div>
+        <p>Leaderboard finish on the Kaggle <code style="font-family:var(--font-mono);font-size:.85em">lish-moa</code> competition.</p>
+        <ul>
+          <li><b>4</b> model families across PyTorch &amp; TabNet</li>
+          <li><b>Average ensembling</b> across runs, folds &amp; seeds</li>
+          <li><b>Multi-label log loss</b> as the evaluation metric</li>
+        </ul>
+        <p class="resnote">Scores shown are cross-validated log loss from each variant's inference notebook; the submitted result blends them.</p>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ NOTEBOOKS ============ -->
+<section class="band" id="notebooks">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="kicker">repository</p>
+      <h2>The notebooks behind it.</h2>
+      <p>An experimental notebook workspace — EDA, three PyTorch iterations, TabNet experiments, and the ensemble logic.</p>
+    </div>
+    <ul class="nb-list reveal">
+      <li><a href="eda.ipynb">eda.ipynb</a><p>Exploratory analysis of raw features and target behavior.</p></li>
+      <li><a href="pytorch.ipynb">pytorch.ipynb</a><p>Early PyTorch baseline experiments.</p></li>
+      <li><a href="pytorch_iteration_2.ipynb">pytorch_iteration_2.ipynb</a><p>Updated PyTorch iteration.</p></li>
+      <li><a href="pytorch_training_final.ipynb">pytorch_training_final.ipynb</a><p>Later-stage training workflow.</p></li>
+      <li><a href="pytorch_inference_final.ipynb">pytorch_inference_final.ipynb</a><p>Later-stage inference workflow.</p></li>
+      <li><a href="pytorch_best_score_0_01839.ipynb">pytorch_best_score_0_01839.ipynb</a><p>Stronger PyTorch result snapshot.</p></li>
+      <li><a href="tabnet_experiments.ipynb">tabnet_experiments.ipynb</a><p>TabNet modeling experiments.</p></li>
+      <li><a href="ensemble.ipynb">ensemble.ipynb</a><p>Blending and ensemble logic.</p></li>
+      <li><a href="submission_correlation_analysis.ipynb">submission_correlation_analysis.ipynb</a><p>Submission-correlation analysis.</p></li>
+    </ul>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap foot-in">
+    <div>
+      <p style="color:var(--ink-2);font-weight:500;margin-bottom:.5rem">Biological Response Modeling — Mechanism of Action Prediction</p>
+      <p>I take a biological fingerprint and turn it into a structured guess about what a compound is doing. Based on the Kaggle lish-moa competition.</p>
+      <div class="stack" aria-label="Tech stack">
+        <span>Python</span><span>PyTorch</span><span>TabNet</span><span>scikit-learn</span><span>pandas</span><span>NumPy</span><span>SciPy</span><span>PCA</span><span>KMeans</span>
+      </div>
+    </div>
+    <div class="foot-links">
+      <a href="README.md">README</a>
+      <a href="#pipeline">Pipeline</a>
+      <a href="https://www.kaggle.com/competitions/lish-moa" target="_blank" rel="noopener">Kaggle ↗</a>
+    </div>
+  </div>
+</footer>
+
+<noscript><div class="wrap" style="padding:1rem 0;color:var(--muted);font-size:.85rem">Code listings and the data visualizations are enhanced with JavaScript.</div></noscript>
+
+<script>
+(function(){
+  "use strict";
+  var root = document.documentElement;
+  root.classList.add('has-js');
+  var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ---------------- real code from the notebooks ---------------- */
+  var SNIPPETS = {
+    normalize: { file: "pytorch-sep_addnewfe.ipynb · RankGauss", code:
+"from sklearn.preprocessing import QuantileTransformer\n\n" +
+"# RankGauss: map every gene/cell feature onto a normal distribution\n" +
+"for col in (GENES + CELLS):\n" +
+"    transformer = QuantileTransformer(n_quantiles=100, random_state=0,\n" +
+"                                      output_distribution=\"normal\")\n" +
+"    vec_len = len(train_features[col].values)\n" +
+"    vec_len_test = len(test_features[col].values)\n" +
+"    raw_vec = train_features[col].values.reshape(vec_len, 1)\n" +
+"    transformer.fit(raw_vec)\n\n" +
+"    train_features[col] = transformer.transform(raw_vec).reshape(1, vec_len)[0]\n" +
+"    test_features[col]  = transformer.transform(\n" +
+"        test_features[col].values.reshape(vec_len_test, 1)).reshape(1, vec_len_test)[0]"
+    },
+    pca: { file: "pytorch-sep_addnewfe.ipynb · PCA", code:
+"from sklearn.decomposition import PCA\n\n" +
+"# GENES -> compressed components\n" +
+"n_comp = 600\n" +
+"pca_g = PCA(n_components=n_comp, random_state=42)\n" +
+"data = pd.concat([train_features[GENES], test_features[GENES]])\n" +
+"gpca = pca_g.fit(data[GENES])\n" +
+"train_gpca = pd.DataFrame(gpca.transform(train_features[GENES]),\n" +
+"                          columns=[f'pca_G-{i}' for i in range(n_comp)])\n" +
+"test_gpca  = pd.DataFrame(gpca.transform(test_features[GENES]),\n" +
+"                          columns=[f'pca_G-{i}' for i in range(n_comp)])\n\n" +
+"# CELLS -> compressed components\n" +
+"n_comp = 50\n" +
+"pca_c = PCA(n_components=n_comp, random_state=42)\n" +
+"data = pd.concat([train_features[CELLS], test_features[CELLS]])\n" +
+"cpca = pca_c.fit(data[CELLS])\n" +
+"train_cpca = pd.DataFrame(cpca.transform(train_features[CELLS]),\n" +
+"                          columns=[f'pca_C-{i}' for i in range(n_comp)])\n\n" +
+"train_features = pd.concat((train_features, train_gpca, train_cpca), axis=1)"
+    },
+    stats: { file: "pytorch-sep_addnewfe.ipynb · fe_stats()", code:
+"def fe_stats(train, test):\n" +
+"    features_g = [c for c in train.columns if c.startswith('g-')]\n" +
+"    features_c = [c for c in train.columns if c.startswith('c-')]\n\n" +
+"    for df in train, test:\n" +
+"        # distribution shape across each feature group\n" +
+"        df['g_sum']  = df[features_g].sum(axis=1)\n" +
+"        df['g_mean'] = df[features_g].mean(axis=1)\n" +
+"        df['g_std']  = df[features_g].std(axis=1)\n" +
+"        df['g_kurt'] = df[features_g].kurtosis(axis=1)\n" +
+"        df['g_skew'] = df[features_g].skew(axis=1)\n" +
+"        df['c_sum']  = df[features_c].sum(axis=1)\n" +
+"        df['c_mean'] = df[features_c].mean(axis=1)\n" +
+"        df['c_std']  = df[features_c].std(axis=1)\n" +
+"        df['c_kurt'] = df[features_c].kurtosis(axis=1)\n" +
+"        df['c_skew'] = df[features_c].skew(axis=1)\n" +
+"        df['gc_sum'] = df[features_g + features_c].sum(axis=1)\n\n" +
+"        # interactions between strongly correlated cell pairs\n" +
+"        df['c52_c42'] = df['c-52'] * df['c-42']\n" +
+"        df['c13_c73'] = df['c-13'] * df['c-73']\n" +
+"        df['c26_c13'] = df['c-26'] * df['c-13']\n\n" +
+"        # squared versions of selected important features\n" +
+"        for feature in features_c:\n" +
+"            df[f'{feature}_squared'] = df[feature] ** 2\n" +
+"        for feature in gsquarecols:\n" +
+"            df[f'{feature}_squared'] = df[feature] ** 2\n" +
+"    return train, test"
+    },
+    cluster: { file: "pytorch-sep_addnewfe.ipynb · KMeans", code:
+"from sklearn.cluster import KMeans\n\n" +
+"def fe_cluster_genes(train, test, n_clusters_g=22, SEED=123):\n" +
+"    features_g = GENES\n" +
+"    data = pd.concat([train[features_g], test[features_g]], axis=0)\n" +
+"    kmeans = KMeans(n_clusters=n_clusters_g, random_state=SEED).fit(data)\n" +
+"    train['clusters_g'] = kmeans.predict(train[features_g].values)\n" +
+"    test['clusters_g']  = kmeans.predict(test[features_g].values)\n" +
+"    train = pd.get_dummies(train, columns=['clusters_g'])\n" +
+"    test  = pd.get_dummies(test,  columns=['clusters_g'])\n" +
+"    return train, test\n\n" +
+"def fe_cluster_pca(train, test, n_clusters=5, SEED=42):\n" +
+"    data = pd.concat([train[pca_fea], test[pca_fea]], axis=0)\n" +
+"    kmeans = KMeans(n_clusters=n_clusters, random_state=SEED).fit(data)\n" +
+"    train['clusters_pca'] = kmeans.predict(train[pca_fea].values)\n" +
+"    test['clusters_pca']  = kmeans.predict(test[pca_fea].values)\n" +
+"    train = pd.get_dummies(train, columns=['clusters_pca'])\n" +
+"    test  = pd.get_dummies(test,  columns=['clusters_pca'])\n" +
+"    return train, test"
+    },
+    variance: { file: "pytorch-sep_addnewfe.ipynb · VarianceThreshold", code:
+"from sklearn.feature_selection import VarianceThreshold\n\n" +
+"# drop near-constant, low-information features\n" +
+"c_n = [f for f in train_features.columns\n" +
+"       if f not in ['sig_id', 'cp_type', 'cp_time', 'cp_dose']]\n" +
+"mask = (train_features[c_n].var() >= 0.8).values\n\n" +
+"meta = ['sig_id', 'cp_type', 'cp_time', 'cp_dose']\n" +
+"train_features = pd.concat(\n" +
+"    [train_features[meta], train_features[c_n].loc[:, mask]], axis=1)\n" +
+"test_features = pd.concat(\n" +
+"    [test_features[meta], test_features[c_n].loc[:, mask]], axis=1)"
+    },
+    model: { file: "pytorch-sep_addnewfe.ipynb · Model", code:
+"import torch.nn as nn\nimport torch.nn.functional as F\n\n" +
+"class Model(nn.Module):\n" +
+"    def __init__(self, num_features, num_targets, hidden_size):\n" +
+"        super(Model, self).__init__()\n" +
+"        self.batch_norm1 = nn.BatchNorm1d(num_features)\n" +
+"        self.dense1 = nn.utils.weight_norm(nn.Linear(num_features, hidden_size))\n\n" +
+"        self.batch_norm2 = nn.BatchNorm1d(hidden_size)\n" +
+"        self.dropout2 = nn.Dropout(0.2)\n" +
+"        self.dense2 = nn.utils.weight_norm(nn.Linear(hidden_size, hidden_size))\n\n" +
+"        self.batch_norm3 = nn.BatchNorm1d(hidden_size)\n" +
+"        self.dropout3 = nn.Dropout(0.2)\n" +
+"        self.dense3 = nn.utils.weight_norm(nn.Linear(hidden_size, num_targets))\n\n" +
+"    def forward(self, x):\n" +
+"        x = self.batch_norm1(x)\n" +
+"        x = F.leaky_relu(self.dense1(x))\n" +
+"        x = self.dropout2(self.batch_norm2(x))\n" +
+"        x = F.leaky_relu(self.dense2(x))\n" +
+"        x = self.dropout3(self.batch_norm3(x))\n" +
+"        x = self.dense3(x)\n" +
+"        return x"
+    },
+    cv: { file: "pytorch-sep_addnewfe.ipynb · MultilabelStratifiedKFold", code:
+"from iterstrat.ml_stratifiers import MultilabelStratifiedKFold\n\n" +
+"# preserve label balance across folds despite sparse, uneven targets\n" +
+"folds = train.copy()\n" +
+"mskf = MultilabelStratifiedKFold(n_splits=7)\n\n" +
+"for f, (t_idx, v_idx) in enumerate(mskf.split(X=train, y=target)):\n" +
+"    folds.loc[v_idx, 'kfold'] = int(f)\n\n" +
+"folds['kfold'] = folds['kfold'].astype(int)"
+    },
+    train: { file: "pytorch-sep_addnewfe.ipynb · run_training() + blend", code:
+"def run_training(fold, seed):\n" +
+"    seed_everything(seed)\n" +
+"    model = Model(num_features, num_targets, hidden_size).to(DEVICE)\n" +
+"    optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE,\n" +
+"                                 weight_decay=WEIGHT_DECAY)\n" +
+"    scheduler = optim.lr_scheduler.OneCycleLR(\n" +
+"        optimizer=optimizer, pct_start=0.1, div_factor=1e3,\n" +
+"        max_lr=1e-2, epochs=EPOCHS, steps_per_epoch=len(trainloader))\n" +
+"    loss_tr = SmoothBCEwLogits(smoothing=0.001)\n\n" +
+"    best_loss = np.inf\n" +
+"    for epoch in range(EPOCHS):\n" +
+"        train_loss = train_fn(model, optimizer, scheduler, loss_tr, trainloader, DEVICE)\n" +
+"        valid_loss, valid_preds = valid_fn(model, loss_fn, validloader, DEVICE)\n" +
+"        if valid_loss < best_loss:            # keep the best checkpoint\n" +
+"            best_loss = valid_loss\n" +
+"            oof[val_idx] = valid_preds\n" +
+"            torch.save(model.state_dict(), f\"SEED{seed}_FOLD{fold}_.pth\")\n" +
+"    return oof, predictions\n\n" +
+"# ---- ensemble: blend model families (they make different mistakes) ----\n" +
+"sub = pd.DataFrame({'sig_id': sub1['sig_id']})\n" +
+"for col in target_cols:\n" +
+"    sub[col] = sub1[col] * 0.5 + sub2[col] * 0.5"
+    }
+  };
+
+  /* ---------------- minimal python syntax highlighter ---------------- */
+  var KW = /\b(?:def|class|return|for|in|if|elif|else|import|from|as|with|while|not|and|or|None|True|False|lambda|self|super|break|continue|pass|try|except|finally|global|yield|is|del|async|await)\b/;
+  var MASTER = new RegExp(
+    "(#.*$)" +                                   // 1 comment
+    "|(\"(?:[^\"\\\\]|\\\\.)*\"|'(?:[^'\\\\]|\\\\.)*')" +  // 2 string
+    "|(\\b\\d+\\.?\\d*(?:e-?\\d+)?\\b)" +         // 3 number
+    "|(" + KW.source + ")" +                     // 4 keyword
+    "|(\\b[A-Za-z_]\\w*(?=\\())",                // 5 function call
+    "g");
+
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function highlightLine(line){
+    var out = '', last = 0, m;
+    MASTER.lastIndex = 0;
+    while((m = MASTER.exec(line)) !== null){
+      out += esc(line.slice(last, m.index));
+      var cls = m[1] ? 'tok-com' : m[2] ? 'tok-str' : m[3] ? 'tok-num' : m[4] ? 'tok-kw' : 'tok-fn';
+      out += '<span class="'+cls+'">' + esc(m[0]) + '</span>';
+      last = m.index + m[0].length;
+      if(m[0].length === 0){ MASTER.lastIndex++; }
+    }
+    out += esc(line.slice(last));
+    return out;
+  }
+
+  function highlight(code){
+    return code.split('\n').map(function(l){
+      return '<span class="line">' + (l.length ? highlightLine(l) : ' ') + '</span>';
+    }).join('');
+  }
+
+  function buildCode(key){
+    var snip = SNIPPETS[key];
+    var det = document.createElement('details');
+    det.className = 'code';
+    det.open = true;
+    var sum = document.createElement('summary');
+    sum.innerHTML =
+      '<span class="dots"><i style="background:oklch(0.66 0.16 36)"></i>' +
+      '<i style="background:oklch(0.78 0.13 90)"></i>' +
+      '<i style="background:oklch(0.62 0.13 150)"></i></span>' +
+      '<span class="file">' + snip.file + '</span>' +
+      '<span class="toggle"><button class="copybtn" type="button">copy</button>' +
+      '<svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>';
+    var pre = document.createElement('pre');
+    pre.className = 'src';
+    pre.innerHTML = highlight(snip.code);
+    det.appendChild(sum);
+    det.appendChild(pre);
+
+    var btn = sum.querySelector('.copybtn');
+    btn.addEventListener('click', function(e){
+      e.preventDefault();
+      navigator.clipboard && navigator.clipboard.writeText(snip.code).then(function(){
+        btn.textContent = 'copied'; btn.classList.add('ok');
+        setTimeout(function(){ btn.textContent = 'copy'; btn.classList.remove('ok'); }, 1400);
+      });
+    });
+    return det;
+  }
+
+  document.querySelectorAll('[data-code]').forEach(function(host){
+    host.appendChild(buildCode(host.getAttribute('data-code')));
+  });
+
+  /* ---------------- hero heatmap ---------------- */
+  (function(){
+    var cv = document.getElementById('heatmap');
+    if(!cv) return;
+    var ctx = cv.getContext('2d');
+    var W = cv.width, H = cv.height;
+    var cols = 56, rows = 36;
+    var cw = W / cols, ch = H / rows;
+
+    // deterministic pseudo-random field (no Math.random for stable look)
+    function val(x, y){
+      var v = Math.sin(x*0.55 + y*0.21) * Math.cos(y*0.4 - x*0.13)
+            + Math.sin((x+y)*0.27) * 0.6
+            + Math.sin(x*0.12)*Math.sin(y*0.33)*0.8;
+      return Math.max(-1, Math.min(1, v/2.0));
+    }
+    // diverging cool -> paper -> hot
+    function color(t, a){
+      // t in [-1,1]
+      var r,g,b;
+      if(t < 0){ var k=-t; r=235-110*k; g=235-70*k; b=235+18*k; }
+      else { var k2=t; r=235+18*k2; g=235-150*k2; b=235-150*k2; }
+      return 'rgba('+(r|0)+','+(g|0)+','+(b|0)+','+a+')';
+    }
+
+    var t0 = null, DUR = 1100;
+    function draw(p){
+      ctx.clearRect(0,0,W,H);
+      for(var y=0; y<rows; y++){
+        for(var x=0; x<cols; x++){
+          // reveal column by column
+          var prog = Math.max(0, Math.min(1, (p*cols - x + 3)/4));
+          if(prog<=0) continue;
+          var v = val(x,y);
+          ctx.fillStyle = color(v, 0.92*prog);
+          var pad = 0.6;
+          ctx.fillRect(x*cw+pad, y*ch+pad, cw-2*pad, ch-2*pad);
+        }
+      }
+    }
+    function anim(ts){
+      if(t0===null) t0=ts;
+      var p = Math.min(1, (ts - t0)/DUR);
+      var eased = 1 - Math.pow(1-p, 3);
+      draw(eased);
+      if(p<1) requestAnimationFrame(anim);
+    }
+    if(reduceMotion){ draw(1); } else { requestAnimationFrame(anim); }
+  })();
+
+  /* ---------------- sparse probability bars ---------------- */
+  (function(){
+    var svg = document.getElementById('probbars');
+    if(!svg) return;
+    var N = 60, w = 460, h = 150, gap = 1.2;
+    var bw = (w - (N-1)*gap)/N;
+    // deterministic: a few elevated, rest near zero
+    var spikes = {7:0.92, 8:0.55, 23:0.78, 24:0.34, 41:0.66, 52:0.41};
+    var html = '';
+    for(var i=0;i<N;i++){
+      var v = spikes[i] || (0.02 + 0.05*Math.abs(Math.sin(i*1.7)));
+      var bh = v*(h-12);
+      var x = i*(bw+gap);
+      var hot = v>0.3;
+      html += '<rect x="'+x.toFixed(1)+'" y="'+(h-bh).toFixed(1)+'" width="'+bw.toFixed(1)+
+              '" height="'+bh.toFixed(1)+'" rx="1" fill="'+(hot?'var(--accent)':'var(--line-2)')+'">';
+      if(!reduceMotion){
+        html += '<animate attributeName="height" from="0" to="'+bh.toFixed(1)+'" dur="0.7s" begin="'+(i*0.012)+'s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1" values="0;'+bh.toFixed(1)+'"/>';
+        html += '<animate attributeName="y" from="'+h+'" to="'+(h-bh).toFixed(1)+'" dur="0.7s" begin="'+(i*0.012)+'s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1" values="'+h+';'+(h-bh).toFixed(1)+'"/>';
+      }
+      html += '</rect>';
+    }
+    svg.innerHTML = html;
+  })();
+
+  /* ---------------- reveal on scroll (never leaves content hidden) ---------------- */
+  (function(){
+    var items = document.querySelectorAll('.reveal, .stagger');
+    function reveal(el){
+      if(!el || el.classList.contains('in')) return;
+      el.classList.add('in');
+      if(el.classList.contains('stagger')){
+        Array.prototype.forEach.call(el.children, function(child, i){
+          child.style.transitionDelay = (i*70) + 'ms';
+        });
+      }
+    }
+    function revealAll(){ items.forEach(reveal); }
+    function revealWithin(container){
+      if(!container) return;
+      if(container.matches && container.matches('.reveal, .stagger')) reveal(container);
+      container.querySelectorAll('.reveal, .stagger').forEach(reveal);
+    }
+
+    // Reduced motion or no observer support: content is simply visible, no animation.
+    if(reduceMotion || !('IntersectionObserver' in window)){ revealAll(); return; }
+
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(en){
+        if(en.isIntersecting){ reveal(en.target); io.unobserve(en.target); }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    items.forEach(function(el){ io.observe(el); });
+
+    // Jumping straight to a section (anchor click or initial #hash) must show it now,
+    // even before the smooth scroll arrives — otherwise it reads as blank.
+    function revealHash(hash){
+      if(hash && hash.length > 1){ try { revealWithin(document.querySelector(hash)); } catch(e){} }
+    }
+    document.addEventListener('click', function(e){
+      var a = e.target.closest && e.target.closest('a[href^="#"]');
+      if(a){ revealHash(a.getAttribute('href')); }
+    });
+    window.addEventListener('hashchange', function(){ revealHash(location.hash); });
+    revealHash(location.hash);
+
+    // Final safety net: nothing ever stays invisible.
+    window.setTimeout(revealAll, 2500);
+  })();
+})();
+</script>
+</body>
+</html>
