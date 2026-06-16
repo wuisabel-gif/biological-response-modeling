@@ -35,3 +35,7 @@ artifacts/*
 # Editor settings
 .vscode/
 .idea/
+
+# Local tooling / skill config
+.claude/
+PRODUCT.md
