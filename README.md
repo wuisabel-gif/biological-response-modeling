@@ -198,15 +198,15 @@ If there is one thing I would want someone to take away from this repository, it
 
 Here is what the main notebooks are for:
 
-- [eda.ipynb](/Users/harvardsummer/Downloads/MoA/eda.ipynb): exploratory analysis of the raw features and target behavior
-- [pytorch.ipynb](/Users/harvardsummer/Downloads/MoA/pytorch.ipynb): early PyTorch baseline experiments
-- [pytorch_iteration_2.ipynb](/Users/harvardsummer/Downloads/MoA/pytorch_iteration_2.ipynb): updated PyTorch iteration
-- [pytorch_training_final.ipynb](/Users/harvardsummer/Downloads/MoA/pytorch_training_final.ipynb): later-stage training workflow
-- [pytorch_inference_final.ipynb](/Users/harvardsummer/Downloads/MoA/pytorch_inference_final.ipynb): later-stage inference workflow
-- [pytorch_best_score_0_01839.ipynb](/Users/harvardsummer/Downloads/MoA/pytorch_best_score_0_01839.ipynb): stronger PyTorch result snapshot
-- [tabnet_experiments.ipynb](/Users/harvardsummer/Downloads/MoA/tabnet_experiments.ipynb): TabNet modeling experiments
-- [ensemble.ipynb](/Users/harvardsummer/Downloads/MoA/ensemble.ipynb): blending and ensemble logic
-- [submission_correlation_analysis.ipynb](/Users/harvardsummer/Downloads/MoA/submission_correlation_analysis.ipynb): submission-correlation analysis
+- [eda.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/eda.ipynb): exploratory analysis of the raw features and target behavior
+- [pytorch.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/pytorch.ipynb): early PyTorch baseline experiments
+- [pytorch_iteration_2.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/pytorch_iteration_2.ipynb): updated PyTorch iteration
+- [pytorch_training_final.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/pytorch_training_final.ipynb): later-stage training workflow
+- [pytorch_inference_final.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/pytorch_inference_final.ipynb): later-stage inference workflow
+- [pytorch_best_score_0_01839.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/pytorch_best_score_0_01839.ipynb): stronger PyTorch result snapshot
+- [tabnet_experiments.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/tabnet_experiments.ipynb): TabNet modeling experiments
+- [ensemble.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/ensemble.ipynb): blending and ensemble logic
+- [submission_correlation_analysis.ipynb](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/submission_correlation_analysis.ipynb): submission-correlation analysis
 
 ## Tech Stack
 
@@ -223,7 +223,7 @@ This project is built primarily with:
 
 ## Running the Project
 
-To recreate the environment, install the packages listed in [requirements.txt](/Users/harvardsummer/Downloads/MoA/requirements.txt).
+To recreate the environment, install the packages listed in [requirements.txt](https://github.com/wuisabel-gif/biological-response-modeling/blob/master/requirements.txt).
 
 Note that several notebooks still reflect the original Kaggle-style file layout, such as references to `../input/lish-moa/...`, so some path cleanup may be needed if you want to run everything locally from scratch.
 
