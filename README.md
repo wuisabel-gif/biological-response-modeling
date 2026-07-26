@@ -12,7 +12,7 @@ This repository contains my notebook-based pipeline for predicting a compound's 
 
 For me, this project was also a learning process. It gave me a way to apply statistics, machine learning, feature engineering, and model evaluation to a real biological prediction problem instead of only studying those ideas in isolation. I got to work through things like noisy data, correlated features, sparse labels, validation strategy, and ensemble behavior in a much more hands-on way.
 
-The final workflow explored three neural-network variants, one TabNet model, and average ensembling across submissions. The best result achieved a **top 3% leaderboard finish**.
+The final workflow explored three neural-network variants, one TabNet model, and average ensembling across submissions. The best result achieved a **top 3% leaderboard finish (ranked 112)**.
 
 Ideally, this kind of project would be as simple as "feed in the biology data, train a model, get a clean answer." Of course, in practice, things are more complicated. Biological data is noisy, many features are strongly correlated, useful signals are often sparse, and a single compound can activate multiple mechanisms at once. So the real work is not just training a model. The real work is building a pipeline that makes the signal easier to learn.
 
